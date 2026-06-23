@@ -304,6 +304,7 @@ Current widget coverage verifies:
 
 ## Demo Materials
 
+- [Google Stitch design reference](https://stitch.withgoogle.com/projects/13843388325237054075)
 - [Screenshots and supporting media](https://drive.google.com/drive/folders/1cdOUNJ1usYreR8xawNUY1JZEdYRfFVat?usp=sharing)
 - [Recorded app demo](https://drive.google.com/file/d/1_D-V-_U_5giCOLmsuKK2O0-z_MflBo0X/view?usp=sharing)
 

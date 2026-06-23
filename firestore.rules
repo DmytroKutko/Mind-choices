@@ -1,0 +1,218 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users/{userId}/heroine_profiles/{profileId}
+    // Access: only the authenticated owner may read/write/delete.
+    // Fields:
+    //   - ownerUid: string, required, immutable, must equal userId
+    //   - name: string, required, 1-32 chars
+    //   - archetype: string, required, 1-40 chars
+    //   - subtitle: string, required, 1-80 chars
+    //   - traits: list, required, 1-3 allowed trait labels
+    //   - imageAsset: string, required, local asset path, max 140 chars
+    //   - profile: string, required, 1-1200 chars
+    //   - greeting: string, required, 1-500 chars
+    //   - storySeed: string, required, 1-900 chars
+    //   - selections: map, required, contains all selected step values
+    //   - createdAt: timestamp, required, immutable
+    //   - updatedAt: timestamp, required
+    //
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function hasOnlyAllowedFields(data, fields) {
+      return data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(data, fields) {
+      return data.keys().hasAll(fields);
+    }
+
+    function validString(value, minSize, maxSize) {
+      return value is string && value.size() >= minSize && value.size() <= maxSize;
+    }
+
+    function validIndex(value, minValue, maxValue) {
+      return value is number && value >= minValue && value <= maxValue;
+    }
+
+    function validProfileTraitLabels(value) {
+      return value is list &&
+        value.size() >= 1 &&
+        value.size() <= 3 &&
+        value.hasOnly([
+          'Brave',
+          'Reflective',
+          'Compassionate',
+          'Intuitive',
+          'Fierce',
+          'Stoic'
+        ]);
+    }
+
+    function validSelectedTraitLabels(value) {
+      return value is list &&
+        value.size() <= 3 &&
+        value.hasOnly([
+          'Brave',
+          'Reflective',
+          'Compassionate',
+          'Intuitive',
+          'Fierce',
+          'Stoic'
+        ]);
+    }
+
+    function validSelectedTraitIndexes(value) {
+      return value is list &&
+        value.size() <= 3 &&
+        value.hasOnly([0, 1, 2, 3, 4, 5]);
+    }
+
+    function validSelections(selections) {
+      return selections is map &&
+        hasOnlyAllowedFields(selections, [
+          'ageIndex',
+          'ageLabel',
+          'genderIndex',
+          'genderLabel',
+          'focusIndex',
+          'focusLabel',
+          'moodIndex',
+          'moodLabel',
+          'aestheticIndex',
+          'aestheticLabel',
+          'visualStyleIndex',
+          'visualStyleLabel',
+          'archetypeIndex',
+          'archetypeLabel',
+          'paletteIndex',
+          'paletteColorValue',
+          'selectedTraitIndexes',
+          'selectedTraitLabels'
+        ]) &&
+        hasRequiredFields(selections, [
+          'ageIndex',
+          'ageLabel',
+          'genderIndex',
+          'genderLabel',
+          'focusIndex',
+          'focusLabel',
+          'moodIndex',
+          'moodLabel',
+          'aestheticIndex',
+          'aestheticLabel',
+          'visualStyleIndex',
+          'visualStyleLabel',
+          'archetypeIndex',
+          'archetypeLabel',
+          'paletteIndex',
+          'paletteColorValue',
+          'selectedTraitIndexes',
+          'selectedTraitLabels'
+        ]) &&
+        validIndex(selections.ageIndex, 0, 4) &&
+        validString(selections.ageLabel, 2, 12) &&
+        validIndex(selections.genderIndex, 0, 2) &&
+        validString(selections.genderLabel, 2, 24) &&
+        validIndex(selections.focusIndex, 0, 3) &&
+        validString(selections.focusLabel, 2, 32) &&
+        validIndex(selections.moodIndex, 0, 4) &&
+        validString(selections.moodLabel, 2, 32) &&
+        validIndex(selections.aestheticIndex, 0, 3) &&
+        validString(selections.aestheticLabel, 2, 36) &&
+        validIndex(selections.visualStyleIndex, 0, 3) &&
+        validString(selections.visualStyleLabel, 2, 20) &&
+        validIndex(selections.archetypeIndex, 0, 3) &&
+        validString(selections.archetypeLabel, 2, 40) &&
+        validIndex(selections.paletteIndex, 0, 3) &&
+        selections.paletteColorValue is number &&
+        validSelectedTraitIndexes(selections.selectedTraitIndexes) &&
+        validSelectedTraitLabels(selections.selectedTraitLabels);
+    }
+
+    function validHeroineProfile(userId, data) {
+      return hasOnlyAllowedFields(data, [
+          'ownerUid',
+          'name',
+          'archetype',
+          'subtitle',
+          'traits',
+          'imageAsset',
+          'profile',
+          'greeting',
+          'storySeed',
+          'selections',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        hasRequiredFields(data, [
+          'ownerUid',
+          'name',
+          'archetype',
+          'subtitle',
+          'traits',
+          'imageAsset',
+          'profile',
+          'greeting',
+          'storySeed',
+          'selections',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        data.ownerUid == userId &&
+        data.ownerUid == request.auth.uid &&
+        validString(data.name, 1, 32) &&
+        validString(data.archetype, 2, 40) &&
+        validString(data.subtitle, 1, 80) &&
+        validProfileTraitLabels(data.traits) &&
+        validString(data.imageAsset, 1, 140) &&
+        data.imageAsset.matches('^assets/images/mock/.*\\.png$') &&
+        validString(data.profile, 1, 1200) &&
+        validString(data.greeting, 1, 500) &&
+        validString(data.storySeed, 1, 900) &&
+        validSelections(data.selections) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp &&
+        data.createdAt <= request.time + duration.value(5, 'm') &&
+        data.updatedAt <= request.time + duration.value(5, 'm') &&
+        data.updatedAt >= data.createdAt;
+    }
+
+    match /users/{userId} {
+      allow read, write: if false;
+
+      match /heroine_profiles/{profileId} {
+        allow read: if isOwner(userId);
+
+        allow create: if isOwner(userId) &&
+          validHeroineProfile(userId, request.resource.data);
+
+        allow update: if isOwner(userId) &&
+          resource.data.ownerUid == userId &&
+          request.resource.data.ownerUid == resource.data.ownerUid &&
+          request.resource.data.createdAt == resource.data.createdAt &&
+          validHeroineProfile(userId, request.resource.data);
+
+        allow delete: if isOwner(userId) &&
+          resource.data.ownerUid == userId;
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
